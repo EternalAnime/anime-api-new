@@ -27,7 +27,10 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     app.get(path, async (req, res) => {
       try {
         const data = await controllerMethod(req, res);
-        if (!res.headersSent) {
+        if (res.headersSent) {
+          return;
+        }
+        if (data !== undefined) {
           return jsonResponse(res, data);
         }
       } catch (err) {
