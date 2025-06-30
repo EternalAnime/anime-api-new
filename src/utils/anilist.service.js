@@ -67,11 +67,17 @@ export async function mapAnilistToHiAnimeId(anilistId) {
     const anilistData = await fetchAnilistInfo(anilistId);
     
     if (!anilistData) {
-      throw new Error(`Anime with AniList ID ${anilistId} not found`);
+      throw new Error(`Anime with AniList ID ${anilistId} not found in AniList database`);
     }
 
     // Use the English title for search, fallback to romaji if not available
     const searchTitle = anilistData.title.english || anilistData.title.romaji;
+    
+    if (!searchTitle) {
+      throw new Error(`No valid title found for AniList ID ${anilistId}`);
+    }
+    
+    console.log(`Searching for anime with title: ${searchTitle}`);
     
     // Search for the anime on HiAnime
     const response = await axios.get(`https://${v1_base_url}/search?keyword=${encodeURIComponent(searchTitle)}`);
@@ -91,23 +97,43 @@ export async function mapAnilistToHiAnimeId(anilistId) {
     // Sort by similarity score
     similarTitles.sort((a, b) => b.similarity - a.similarity);
     
+    console.log(`Found ${similarTitles.length} potential matches`);
+    
     // If no results found
     if (similarTitles.length === 0) {
-      throw new Error(`No matches found for anime with AniList ID ${anilistId}`);
+      throw new Error(`No matches found on HiAnime for anime with title "${searchTitle}" (AniList ID: ${anilistId})`);
     }
 
+    // Log the top matches for debugging
+    similarTitles.slice(0, 3).forEach((match, index) => {
+      console.log(`Match ${index + 1}: ${match.title} (ID: ${match.id}, Similarity: ${match.similarity})`);
+    });
+
     // Handle season matching similar to hianime-mapper
+    let selectedMatch;
     if (
       (searchTitle.match(/\Season(.+?)\d/) && similarTitles[0].title.match(/\Season(.+?)\d/)) || 
       (!searchTitle.match(/\Season(.+?)\d/) && !similarTitles[0].title.match(/\Season(.+?)\d/))
     ) {
-      return similarTitles[0].id;
+      selectedMatch = similarTitles[0];
     } else {
-      return similarTitles[1]?.id || similarTitles[0].id;
+      selectedMatch = similarTitles[1] || similarTitles[0];
     }
+    
+    if (!selectedMatch || !selectedMatch.id) {
+      throw new Error(`Failed to select a valid match for "${searchTitle}" (AniList ID: ${anilistId})`);
+    }
+    
+    console.log(`Selected match: ${selectedMatch.title} (ID: ${selectedMatch.id}, Similarity: ${selectedMatch.similarity})`);
+    
+    return selectedMatch.id;
   } catch (error) {
     console.error('Error mapping AniList ID to HiAnime ID:', error);
-    throw new Error(`Failed to map AniList ID ${anilistId} to HiAnime ID`);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw new Error(`Failed to map AniList ID ${anilistId} to HiAnime ID: ${error.message}`);
   }
 }
 
