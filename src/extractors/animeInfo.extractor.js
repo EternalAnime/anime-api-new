@@ -32,6 +32,7 @@ async function extractAnimeInfo(id) {
       if (el.hasClass("tick-quality")) tvInfo.quality = text;
       else if (el.hasClass("tick-sub")) tvInfo.sub = text;
       else if (el.hasClass("tick-dub")) tvInfo.dub = text;
+      else if (el.hasClass("tick-eps")) tvInfo.eps = text;
       else if (el.hasClass("tick-pg")) tvInfo.rating = text;
       else if (el.is("span.item")) {
         if (!tvInfo.showType) tvInfo.showType = text;
@@ -74,6 +75,27 @@ async function extractAnimeInfo(id) {
           : $(el).find(".name").text().split(" ").join("-").trim();
       animeInfo[key] = value;
     });
+
+    const trailers = [];
+    $('.block_area-promotions-list .screen-items .item').each((_, element) => {
+      const el = $(element);
+      const title = el.attr('data-title');
+      const url = el.attr('data-src');
+      if (url) {
+        const fullUrl = url.startsWith('//') ? `https:${url}` : url;
+        let videoId = null;
+        const match = fullUrl.match(/\/embed\/([^?&]+)/);
+        if (match && match[1]) {
+          videoId = match[1];
+        }
+        trailers.push({
+          title: title || null,
+          url: fullUrl,
+          thumbnail: videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null
+        });
+      }
+    });
+    animeInfo.trailers = trailers;
 
     const season_id = formatTitle(title, data_id);
     animeInfo["Overview"] = overviewElement.text().trim();
